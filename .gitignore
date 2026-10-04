@@ -1,0 +1,41 @@
+# Git Ignore for AFTERMATH
+
+# Dependencies
+node_modules/
+.venv/
+env/
+venv/
+
+# Build artifacts
+.next/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Python cache & testing
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Local database & logs
+*.db
+*.sqlite3
+data/
+*.log
+
+# Environment & secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,108 @@
+name: AFTERMATH CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-checks:
+    name: Backend Quality & Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aftermath
+          POSTGRES_PASSWORD: aftermath_test_secret
+          POSTGRES_DB: aftermath_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run Ruff Linter & Formatter
+        run: |
+          ruff check backend/src backend/tests
+          ruff format --check backend/src backend/tests
+
+      - name: Run MyPy Strict Typecheck
+        run: |
+          mypy --strict backend/src
+
+      - name: Run Alembic Database Migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://aftermath:aftermath_test_secret@localhost:5432/aftermath_test
+        run: |
+          cd backend
+          alembic upgrade head
+          alembic downgrade -1
+          alembic upgrade head
+
+      - name: Run Pytest Suite with Coverage
+        env:
+          DATABASE_URL: postgresql+asyncpg://aftermath:aftermath_test_secret@localhost:5432/aftermath_test
+          ENVIRONMENT: test
+        run: |
+          cd backend
+          pytest --cov=aftermath --cov-report=term-missing tests/
+
+  frontend-checks:
+    name: Frontend Quality & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run ESLint
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run TypeScript Typecheck
+        run: |
+          cd frontend
+          npx tsc --noEmit
+
+      - name: Run Frontend Tests
+        run: |
+          cd frontend
+          npm run test
+
+      - name: Build Next.js Production Bundle
+        run: |
+          cd frontend
+          npm run build
